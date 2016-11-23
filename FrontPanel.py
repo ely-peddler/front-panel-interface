@@ -9,6 +9,8 @@ import sys
 import os
 import pylirc
 
+import Player
+
 class FrontPanel(object):
 
 	_instance = None
@@ -25,7 +27,7 @@ class FrontPanel(object):
 			return
 		else:
 			self.init_called = True
-		self.player = None
+		self.player = Player.Player()
 		self.on = False
 		self.blank_cell = "        "
 		self.text = [ [ self.blank_cell, self.blank_cell ], [ self.blank_cell, self.blank_cell ] ]
@@ -104,14 +106,11 @@ class FrontPanel(object):
 		#time.sleep(1)
 		self.setup_screen(250)
 		time.sleep(0.8)
-		self.player = subprocess.Popen("mpg123 --remote", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-		self.player.stdin.write('silence\n')
+		self.player.startup()
+
 		
 	def turn_off(self):
-		if self.player:
-			print("quitting player")
-			self.player.stdin.write('quit\n')
-			self.player = None
+		self.player.shutdown()
 		print("off")
 		self.on = False
 		#self.text = ""
@@ -150,6 +149,9 @@ class FrontPanel(object):
 				self.write_text(text)
 				time.sleep(3)
 
+	def check_player(self):
+		self.player.check()
+		
 	def check_for_input(self):
 		next_action = self.check_ir_sensor()
 #		print("IR "+str(next_action))
@@ -188,36 +190,40 @@ class FrontPanel(object):
 				self.display_text("Shutdown cancel",1,0)
 				time.sleep(1)
 			self.action_count = 0
-                       	self.action = action
+			self.action = action
 		else: 
 			self.action_count += 1
 
 		if(self.action == "POWER"):
-                	if(self.action_count == 0):
+			if(self.action_count == 0):
 				self.toggle()
 			elif(self.action_count == 10 and self.on):
-              			self.turn_off()
+				self.turn_off()
 			elif(self.action_count == 20):
 				self.turn_on()  # to display shut down message
  				self.display_text("Shutting down",1,0)
 				self.on = False # to stop an other input or display
  			elif(self.action_count == 30):
- 				self.turn_off()
-#	                	GPIO.setup(self.ser_pin, GPIO.OUT)
-#				GPIO.output(self.ser_pin, GPIO.HIGH) 				
+ 				self.turn_off() 				
 				os.system( "poweroff" )
   				sys.exit()
-		elif(self.on):
+		elif(self.on and self.action_count == 0):
+			action = self.action
 			action_text = self.blank_cell
-	                if(self.action != None):
+			if(self.action != None):
 				action_text = self.action
-				if(self.action == "OPEN"):
-					subprocess.call("eject")
+			if(self.action == "OPEN"):
+				subprocess.call("eject")
 			if(action_text == "PLAY"):
-				file = '/data/music/Alabama 3/Outlaw/Disc 1 - 5 - Hello... I\'m Johnny Cash.mp3'
-				self.player.stdin.write("L "+file+"\n")
-                        if(action_text == "STOP"):
-                                self.player.stdin.write("S\n")
+				self.player.play()
+			elif(action_text == "PAUSE"):
+				self.player.pause()
+			elif(action_text == "STOP"):
+				self.player.stop()
+			elif(action_text == "NEXT" or action_text == "FORWARD"):
+				self.player.next()
+			elif(action_text == "PREV" or action_text == "REWIND"):
+				self.player.prev()
 			elif(action_text == ""):
 				action_text = self.blank_cell
 			if(action_text != self.blank_cell):

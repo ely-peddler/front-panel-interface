@@ -39,6 +39,8 @@ def main():
 		panel.display_text(ip, 1, 0)
 
 		panel.display_clock()
+		
+		panel.check_player()
 
 		time.sleep(0.1)
 
