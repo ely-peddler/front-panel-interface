@@ -1,238 +1,20 @@
 #!/usr/bin/env python
 
 import RPi.GPIO as GPIO
-import time
-import serial
-import socket
 import commands
-import datetime
-import subprocess
 import signal
 import sys
-import os
 import pylirc
+import time
+
+import FrontPanel
 
 panel = None
 
 def signal_handler(signal, frame):
-	panel = FrontPanel()
+	panel = FrontPanel.FrontPanel()
 	panel.turn_off()
         sys.exit(0)
-
-class FrontPanel(object):
-
-	_instance = None
-
-	def __new__(cls, *args, **kwargs):
-		if not cls._instance:
-			print("Creating singleton")
-			cls._instance = super(FrontPanel, cls).__new__(cls, *args, **kwargs)
-		return cls._instance
-
-	init_called = False
-	def __init__(self):
-		if self.init_called:
-			return
-		else:
-			self.init_called = True
-		self.player = None
-		self.on = False
-		self.blank_cell = "        "
-		self.text = [ [ self.blank_cell, self.blank_cell ], [ self.blank_cell, self.blank_cell ] ]
-
-        	self.standby_pin = 23
-        	GPIO.setup(self.standby_pin, GPIO.OUT)
-        	GPIO.output(self.standby_pin, GPIO.HIGH)
-
-		time.sleep(1)
-
-		self.ser = serial.Serial("/dev/ttyAMA0", 9600, timeout=5)
-#		time.sleep(1)
-		self.setup_screen(250)
-		print("2")
-
-		self.col_pins = [ 11, 12, 13, 15, 16 ] #[ 16, 18, 22, 24, 26 ]
-		self.row_pins = [ 18, 22 ] #[ 21, 23 ]
-
-        	for col_pin in self.col_pins:
-                	print(col_pin)
-                	GPIO.setup(col_pin, GPIO.OUT)
-                	GPIO.output(col_pin, GPIO.LOW)
-
-        	for row_pin in self.row_pins:
-                	print(row_pin)
-                	GPIO.setup(row_pin, GPIO.IN, pull_up_down = GPIO.PUD_DOWN)
-
-		self.actions = [ [ "SELECT", "BACK", "OPEN", "REWIND", "FORWARD" ],
-                                 [ "NEXT", "PREVIOUS", "PAUSE", "PLAY", "STOP" ] ]
-        	self.action = ""	
-		self.action_count = 0
-
-        	
-		self.power_check_pin = 19
-        	GPIO.setup(self.power_check_pin, GPIO.IN)
-
-		
-#        	self.powered_up_pin = 12
- #       	GPIO.setup(self.powered_up_pin, GPIO.OUT)
-  #      	GPIO.output(self.powered_up_pin, GPIO.HIGH)
-		
-	
-	def shutdown():
-		self.turn_off
-		GPIO.output(self.standby_pin, GPIO.HIGH)
-
-	def clear_screen(self):
-		print("Clear screen")
-		self.ser.write(chr(4)+chr(0xFF))
-		self.text = [ [ self.blank_cell, self.blank_cell ], [ self.blank_cell, self.blank_cell ] ]
-		print(self.text)
-
-	def setup_screen(self, brightness):
-		print("Setup screen")
-		#time.sleep(1)
-		self.ser.write(chr(5)+chr(2)+chr(16)+chr(0xFF))
-		self.clear_screen()
-		# set brightness
-		self.ser.write(chr(7)+chr(brightness)+chr(0xFF))
-		#time.sleep(1)
-
-	def move_cursor(self, row, col):
-#		print("Cursor "+str(row)+", "+str(col))
-		self.ser.write(chr(2)+chr(row+1)+chr((col*8)+1)+chr(0xff))
-		#self.ser.write(chr(2)+chr(line)+chr(col)+chr(0xFF))
-
-	def write_text(self, text):
-#		print("Write text: "+text)
-		self.ser.write(chr(1)+text+chr(0xFF))
-
-	def turn_on(self):
-		print("on")
-		self.on = True
-		GPIO.output(self.standby_pin, GPIO.LOW)
-		#self.ser = serial.Serial("/dev/ttyAMA0", 9600, timeout=5)
-		#time.sleep(1)
-		self.setup_screen(250)
-		time.sleep(0.8)
-		self.player = subprocess.Popen("mpg123 --remote", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-		self.player.stdin.write('silence\n')
-		
-	def turn_off(self):
-		if self.player:
-			print("quitting player")
-			self.player.stdin.write('quit\n')
-			self.player = None
-		print("off")
-		self.on = False
-		#self.text = ""
-		#self.clear_screen()
-		#self.ser.write(chr(7)+chr(0)+chr(0xFF))
-		self.setup_screen(0)
-		GPIO.output(self.standby_pin, GPIO.HIGH)
-		#self.ser = None
-		#time.sleep(1)
-
-	def toggle(self):
-		if(self.on):
-			self.turn_off()
-		else:
-			self.turn_on()
-		
-	def display_clock(self):
-		 if(self.on):
-                        self.display_text(datetime.datetime.now().strftime("%H:%M:%S"), 0, 1)
-			
-	def display_text(self, text, row, col):
-#		print("Display '"+text+"' @ "+str(row)+","+str(col))
-		if(self.on):
-			if(self.text[row][col] != text):
-				self.text[row][col] = text
-#				print(self.text)
-				self.move_cursor(row, col)
-				#self.ser.write(chr(2)+chr(row+1)+chr((col*8)+1)+chr(0xff))
-				self.write_text(text)
-				return
-				self.text = text
-				self.move_cursor(row+1,(column*8)+1)
-				self.write_text("        ")
-				time.sleep(3)
-				self.move_cursor(row+1,(column*8)+1)
-				self.write_text(text)
-				time.sleep(3)
-
-	def check_for_input(self):
-		next_action = self.check_ir_sensor()
-#		print("IR "+str(next_action))
-		if(next_action == None):
-			next_action = self.check_buttons()
-#			print("Button "+str(next_action))
-#		if(next_action != None):
-		self.handle_action(next_action)
-
-	def check_buttons(self):
-		if(GPIO.input(self.power_check_pin)):
-			print("POWER")
-			return "POWER"
-		else:
-			next_action = None
-			if(self.on):
-				for col in range(len(self.col_pins)):
-					GPIO.output(self.col_pins[col], GPIO.HIGH)
-					for row in range(len(self.row_pins)):
-						if(GPIO.input(self.row_pins[row])):
-							next_action = self.actions[row][col]
-					GPIO.output(self.col_pins[col], GPIO.LOW)
-			return next_action
-
-	def check_ir_sensor(self):
-		s = pylirc.nextcode()
-		if(s != None):
-			if(self.on or s[0] == "POWER"):
-				return s[0]
-		return None
-
-	def handle_action(self, action):
-		if(action != self.action and (action != None or self.action_count > 5)):
-			if(self.action == "POWER" and self.action_count >= 20):
-				self.on = True
-				self.display_text("Shutdown cancel",1,0)
-				time.sleep(1)
-			self.action_count = 0
-                       	self.action = action
-		else: 
-			self.action_count += 1
-
-		if(self.action == "POWER"):
-                	if(self.action_count == 0):
-				self.toggle()
-			elif(self.action_count == 10 and self.on):
-              			self.turn_off()
-			elif(self.action_count == 20):
-				self.turn_on()  # to display shut down message
- 				self.display_text("Shutting down",1,0)
-				self.on = False # to stop an other input or display
- 			elif(self.action_count == 30):
- 				self.turn_off()
-#	                	GPIO.setup(self.ser_pin, GPIO.OUT)
-#				GPIO.output(self.ser_pin, GPIO.HIGH) 				
-				os.system( "poweroff" )
-  				sys.exit()
-		elif(self.on):
-			action_text = self.blank_cell
-	                if(self.action != None):
-				action_text = self.action
-				if(self.action == "OPEN"):
-					subprocess.call("eject")
-			if(action_text == "PLAY"):
-				file = '/data/music/Alabama 3/Outlaw/Disc 1 - 5 - Hello... I\'m Johnny Cash.mp3'
-				self.player.stdin.write("L "+file+"\n")
-                        if(action_text == "STOP"):
-                                self.player.stdin.write("S\n")
-			elif(action_text == ""):
-				action_text = self.blank_cell
-			if(action_text != self.blank_cell):
-				print("Action '"+action_text+"'")
-			self.display_text(action_text, 0,0)
 
 
 def main():
@@ -247,33 +29,14 @@ def main():
 	# use P1 header pin numbering convention
 	GPIO.setmode(GPIO.BOARD)
 
-	panel = FrontPanel()
+	panel = FrontPanel.FrontPanel()
 	panel.turn_on()
 
 	while True:
-#		if(GPIO.input(panel.power_check_pin) or panel.check_ir_power()):
-#			if(power_off == 0):
-#				panel.toggle()
-#			elif(power_off == 1 and panel.on):
-#				panel.turn_off()
-#			elif(power_off == 5):
-#				panel.toggle()
-#				panel.display_text("Shutting down")
-#			elif(power_off == 9):
-#				panel.turn_off()
-#				os.system( "poweroff" ) 
-#				sys.exit()
-#			else:
-#				time.sleep(0.5)
-#			power_off += 1
-#			continue
-
-#		power_off = 0
 
 		panel.check_for_input()
 
 		panel.display_text(ip, 1, 0)
-		#panel.display_text("test", 0, 0)
 
 		panel.display_clock()
 
