@@ -36,7 +36,7 @@ def main():
 
 		panel.check_for_input()
 
-		panel.display_text(ip, 1, 0)
+#		panel.display_text(ip, 1, 0)
 
 		panel.display_clock()
 		

@@ -28,6 +28,7 @@ class FrontPanel(object):
 		else:
 			self.init_called = True
 		self.player = Player.Player()
+		self.song = None
 		self.on = False
 		self.blank_cell = "        "
 		self.text = [ [ self.blank_cell, self.blank_cell ], [ self.blank_cell, self.blank_cell ] ]
@@ -129,7 +130,7 @@ class FrontPanel(object):
 		
 	def display_clock(self):
 		 if(self.on):
-                        self.display_text(datetime.datetime.now().strftime("%H:%M:%S"), 0, 1)
+		 	self.display_text(datetime.datetime.now().strftime("%H:%M:%S"), 0, 1)
 			
 	def display_text(self, text, row, col):
 #		print("Display '"+text+"' @ "+str(row)+","+str(col))
@@ -150,7 +151,29 @@ class FrontPanel(object):
 				time.sleep(3)
 
 	def check_player(self):
-		self.player.check()
+		if self.on:
+			song = self.player.check()
+			if song:
+				if not self.song or self.song.title != song.title:
+					self.display_text("                ", 1, 0)
+					self.scroll = 0
+					self.scroll_delta = 0.3
+					self.scroll_display_length = 16
+				if  len(song.title) > 0 and len(song.title) < 16:
+					self.scroll_delta = 0
+					self.scroll_display_length = len(song.title)
+				else:
+					if int(self.scroll) < 0:
+						self.scroll_delta = -self.scroll_delta
+						self.scroll = 0
+					elif len(song.title)-int(self.scroll) < 16:
+						self.scroll_delta = -self.scroll_delta
+						self.scroll = len(song.title) - 16
+				self.display_text(song.title[int(self.scroll):int(self.scroll)+self.scroll_display_length], 1, 0)
+				self.scroll += self.scroll_delta
+			else:
+				self.display_text("                ", 1, 0)
+			self.song = song
 		
 	def check_for_input(self):
 		next_action = self.check_ir_sensor()

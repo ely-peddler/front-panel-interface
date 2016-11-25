@@ -6,6 +6,14 @@ import random
 import fcntl
 import os
 
+class Song(object):
+	
+	def __init__(self):
+		self.title = ""
+		self.album = ""
+		self.artist = ""
+
+
 class Player(object):
 
 	def __init__(self):
@@ -18,6 +26,8 @@ class Player(object):
 		self.playlist_pos = 0
 		self.loaded_file = ""
 		self.playing = False
+		self.current_song = None
+		
 		
 	def startup(self):
 		if not self.player:
@@ -43,9 +53,10 @@ class Player(object):
 				self.player.stdin.write('lp '+self.loaded_file+'\n')
 			print "pos "+str(self.playlist_pos)
 			self.player.stdin.write('p\n')
+			self.current_song = Song()
 			self.read()
 			self.playing = True
-		
+				
 	def pause(self):
 		if self.player and self.playing:
 			self.playing = False
@@ -77,6 +88,7 @@ class Player(object):
 		output = self.read()
 		if len(output) == 1 and output[0] == "@P 0" and self.playing:
 			self.next()
+		return self.current_song	
 		
 				
 	def read(self):
@@ -87,6 +99,15 @@ class Player(object):
 				if  line == "": 
 					break
 				output.append(line)
+				if self.current_song:
+					if line.startswith("@I ID3v2.title:"):
+						print line
+						print line[15:]
+						self.current_song.title = line[15:]
+					if line.startswith("@I ID3v2.album:"):
+						self.current_song.album = line[15:]
+					if line.startswith("@I ID3v2.artist:"):
+						self.current_song.artist = line[16:]
 			except IOError:
 				# the os throws an exception if there is no data
 				#print '[No more data]'
