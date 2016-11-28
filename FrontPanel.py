@@ -160,6 +160,7 @@ class FrontPanel(object):
 					self.scroll_delta = 0.3
 					self.scroll_display_length = 16
 				if  len(song.title) > 0 and len(song.title) < 16:
+					self.scroll = 0
 					self.scroll_delta = 0
 					self.scroll_display_length = len(song.title)
 				else:
