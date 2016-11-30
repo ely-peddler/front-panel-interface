@@ -5,6 +5,7 @@ import glob
 import random
 import fcntl
 import os
+import json
 
 class Song(object):
 	
@@ -17,7 +18,7 @@ class Song(object):
 class Player(object):
 
 	def __init__(self):
-		self.music_dir = "/data/music"
+		self.config_filename = "/etc/front-panel/player.conf"
 		self.reset()
 		
 	def reset(self):
@@ -117,6 +118,19 @@ class Player(object):
 		return output
 			
 	def add_file(self):
-		files = glob.glob(self.music_dir+"/*/*/*.mp3")
+		config = None
+		with open(self.config_filename) as config_file:
+			config = json.load(config_file)
+		files = list()
+		if config:
+			for artist in config["artists"]:
+				files.extend(glob.glob(config["music folder"]+"/"+artist+"/*/*.mp3"))
+#			for album in config["albums"]:
+#				files.extend(glob.glob(config["music folder"]+"/*/"+album+"/*.mp3"))
+		if len(files) == 0:
+			files.extend(glob.glob("/data/music/*/*/*.mp3"))
 		self.playlist.append(files[random.randint(0, len(files)-1)])
+
+		
+		
 
