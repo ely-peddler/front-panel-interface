@@ -14,7 +14,6 @@ class Song(object):
 		self.album = ""
 		self.artist = ""
 
-
 class Player(object):
 
 	def __init__(self):
@@ -28,7 +27,6 @@ class Player(object):
 		self.loaded_file = ""
 		self.playing = False
 		self.current_song = None
-		
 		
 	def startup(self):
 		if not self.player:
@@ -129,7 +127,14 @@ class Player(object):
 #				files.extend(glob.glob(config["music folder"]+"/*/"+album+"/*.mp3"))
 		if len(files) == 0:
 			files.extend(glob.glob("/data/music/*/*/*.mp3"))
-		self.playlist.append(files[random.randint(0, len(files)-1)])
+		if config["shuffle"]:
+			self.playlist.append(files[random.randint(0, len(files)-1)])
+		else:
+			if len(files) <= len(self.playlist):
+				self.playlist = list()
+				self.playlist_pos = 0			
+			self.playlist.append(sorted(files)[len(self.playlist)])
+				
 
 		
 		
