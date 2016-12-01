@@ -56,6 +56,8 @@ class Player(object):
 				self.loaded_file = self.playlist[self.playlist_pos]
 				self.player.stdin.write('lp '+self.loaded_file+'\n')
 			print "pos "+str(self.playlist_pos)
+			print "file "+self.playlist[self.playlist_pos]
+			print "playlist size "+str(len(self.playlist))
 			self.player.stdin.write('p\n')
 			self.current_song = Song()
 			self.read()
@@ -95,7 +97,14 @@ class Player(object):
 			
 	def check(self):
 		output = self.read()
-		if len(output) == 1 and output[0] == "@P 0" and self.playing:
+		p = -1
+		for msg in output:
+			if msg.startswith("@P "):
+				p = int(msg[3:4])
+				print msg+" p="+str(p)
+		
+		if p == 0 and self.playing:
+			print "next p="+str(p)
 			self.next()
 		return self.current_song	
 		
