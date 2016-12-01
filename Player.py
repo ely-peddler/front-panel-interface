@@ -22,10 +22,13 @@ class Player(object):
 		
 	def reset(self):
 		self.player = None
-		self.playlist = list()
-		self.playlist_pos = 0
 		self.loaded_file = ""
 		self.playing = False
+		self.clear_playlist()
+		
+	def clear_playlist(self):
+		self.playlist = list()
+		self.playlist_pos = 0
 		self.current_song = None
 		
 	def startup(self):
@@ -46,7 +49,9 @@ class Player(object):
 	def play(self):
 		if self.player and not self.playing:
 			while self.playlist_pos+1 > len(self.playlist):
-				self.add_file()
+				if not self.add_file():
+					self.stop()
+					return
 			if self.playlist[self.playlist_pos] != self.loaded_file:
 				self.loaded_file = self.playlist[self.playlist_pos]
 				self.player.stdin.write('lp '+self.loaded_file+'\n')
@@ -65,6 +70,11 @@ class Player(object):
 	
 	def stop(self):
 		if self.player:
+			self.clear_playlist()
+			self.stop_current_song()
+			
+	def stop_current_song(self):
+		if self.player:
 			self.playing = False
 			self.player.stdin.write('stop\n')
 			self.loaded_file = ""
@@ -72,13 +82,13 @@ class Player(object):
 		
 	def next(self):
 		if self.player:
-			self.stop()
+			self.stop_current_song()
 			self.playlist_pos += 1
 			self.play()
 	
 	def prev(self):
 		if self.player:
-			self.stop()
+			self.stop_current_song()
 			if self.playlist_pos > 0:
 				self.playlist_pos -= 1
 			self.play()
@@ -127,14 +137,19 @@ class Player(object):
 #				files.extend(glob.glob(config["music folder"]+"/*/"+album+"/*.mp3"))
 		if len(files) == 0:
 			files.extend(glob.glob("/data/music/*/*/*.mp3"))
+		if len(files) <= len(self.playlist):
+			self.clear_playlist()
+			if not config["loop"]:
+				return False
 		if config["shuffle"]:
-			self.playlist.append(files[random.randint(0, len(files)-1)])
-		else:
-			if len(files) <= len(self.playlist):
-				self.playlist = list()
-				self.playlist_pos = 0			
+			new_file = files[random.randint(0, len(files)-1)]
+			while new_file in self.playlist:
+				new_file = files[random.randint(0, len(files)-1)]
+			self.playlist.append(new_file)
+		else:			
 			self.playlist.append(sorted(files)[len(self.playlist)])
-				
+		return True
+
 
 		
 		
