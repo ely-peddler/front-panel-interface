@@ -55,11 +55,11 @@ class Player(object):
 			if self.playlist[self.playlist_pos] != self.loaded_file:
 				self.loaded_file = self.playlist[self.playlist_pos]
 				self.player.stdin.write('lp '+self.loaded_file+'\n')
+				self.current_song = Song()
 			print "pos "+str(self.playlist_pos)
 			print "file "+self.playlist[self.playlist_pos]
 			print "playlist size "+str(len(self.playlist))
 			self.player.stdin.write('p\n')
-			self.current_song = Song()
 			self.read()
 			self.playing = True
 				
