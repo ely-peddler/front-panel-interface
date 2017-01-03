@@ -28,7 +28,8 @@ class FrontPanel(object):
 		else:
 			self.init_called = True
 		self.player = Player.Player()
-		self.song = None
+		self.song_title_artist = ""
+		self.song_info = list()
 		self.on = False
 		self.blank_cell = "        "
 		self.text = [ [ self.blank_cell, self.blank_cell ], [ self.blank_cell, self.blank_cell ] ]
@@ -150,31 +151,75 @@ class FrontPanel(object):
 				self.write_text(text)
 				time.sleep(3)
 
-	def check_player(self):
-		if self.on:
-			song = self.player.check()
-			if song:
-				if not self.song or self.song.title != song.title:
-					self.display_text("                ", 1, 0)
-					self.scroll = 0
-					self.scroll_delta = 0.3
-					self.scroll_display_length = 16
-				if  len(song.title) > 0 and len(song.title) < 16:
-					self.scroll = 0
-					self.scroll_delta = 0
-					self.scroll_display_length = len(song.title)
+	def split_into_chunks(self, text, chunks, chunk_length = 16):
+		print text
+		if len(text) <= chunk_length:
+			next_chunk = text
+			while len(next_chunk) < chunk_length:
+				next_chunk += " "
+			chunks.append(next_chunk)
+			print chunks
+		else:
+			words = text.split()
+			next_chunk = ""
+			for word in words:
+				if len(word) == 0:
+					continue
+				if len(next_chunk) + len(word) + 1 < chunk_length:
+					if len(next_chunk) > 0:
+						next_chunk += " "
+					next_chunk += word
 				else:
-					if int(self.scroll) < 0:
-						self.scroll_delta = -self.scroll_delta
-						self.scroll = 0
-					elif len(song.title)-int(self.scroll) < 16:
-						self.scroll_delta = -self.scroll_delta
-						self.scroll = len(song.title) - 16
-				self.display_text(song.title[int(self.scroll):int(self.scroll)+self.scroll_display_length], 1, 0)
-				self.scroll += self.scroll_delta
+					if len(next_chunk) > 0:
+						while len(next_chunk) < chunk_length:
+							next_chunk += " "
+						chunks.append(next_chunk)
+						next_chunk = ""
+					if len(word) < chunk_length:
+						next_chunk = word
+					else:
+						pos = 0
+						while pos < len(word):
+							if len(word)-pos == chunk_length:
+								chunks.append(word[pos:pos+chunk_length])
+								pos += chunk_length
+							else:
+								chunks.append(word[pos:pos+chunk_length-1]+"-")
+								pos += chunk_length-1
+				print chunks
+			if len(next_chunk) > 0:
+				while len(next_chunk) < chunk_length:
+					next_chunk += " "
+				chunks.append(next_chunk)
+		
+	def display_song(self):
+		if self.on:
+			player_song_title_artist = ""
+			player_song = self.player.check()
+			if player_song and len(player_song.title) > 0:
+				player_song_title_artist = player_song.title+" "+player_song.artist
+				#print "----------------"
+				#print player_song_title_artist
+				#print self.song_title_artist
+				#print "================="
+				if self.song_title_artist != player_song_title_artist:
+					self.display_text("                ", 1, 0)
+					self.song_info = list()
+					self.split_into_chunks(player_song.title.strip(), self.song_info)
+					self.split_into_chunks(player_song.artist.strip(), self.song_info) 
+					self.song_info_index = 0
+					#print "Song info"
+					#print self.song_info
+					#print player_song.title
+					#print player_song.artist
+				if len(self.song_info) > 0:
+					if self.song_info_index >= len(self.song_info):
+						self.song_info_index = 0
+					self.display_text(self.song_info[int(self.song_info_index)], 1, 0)
+					self.song_info_index += 0.05
 			else:
 				self.display_text("                ", 1, 0)
-			self.song = song
+			self.song_title_artist = player_song_title_artist
 		
 	def check_for_input(self):
 		next_action = self.check_ir_sensor()

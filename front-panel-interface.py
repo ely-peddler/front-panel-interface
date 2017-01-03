@@ -40,7 +40,7 @@ def main():
 
 		panel.display_clock()
 		
-		panel.check_player()
+		panel.display_song()
 
 		time.sleep(0.1)
 
