@@ -151,46 +151,42 @@ class FrontPanel(object):
 				self.write_text(text)
 				time.sleep(3)
 
+	def add_chunk(self, chunk, chunks, chunk_length):
+		while len(chunk) < chunk_length:
+			chunk += " "
+		chunks.append(chunk)
+	
 	def split_into_chunks(self, text, chunks, chunk_length = 16):
 		print text
 		if len(text) <= chunk_length:
-			next_chunk = text
-			while len(next_chunk) < chunk_length:
-				next_chunk += " "
-			chunks.append(next_chunk)
+			self.add_chunk(text, chunks, chunk_length)
 			print chunks
 		else:
 			words = text.split()
 			next_chunk = ""
 			for word in words:
-				if len(word) == 0:
-					continue
-				if len(next_chunk) + len(word) + 1 < chunk_length:
-					if len(next_chunk) > 0:
-						next_chunk += " "
+				if len(next_chunk) == 0 and len(word) < chunk_length:
 					next_chunk += word
+				elif len(next_chunk) + len(word) + 1 < chunk_length:
+					next_chunk += " " + word
 				else:
 					if len(next_chunk) > 0:
-						while len(next_chunk) < chunk_length:
-							next_chunk += " "
-						chunks.append(next_chunk)
+						self.add_chunk(next_chunk, chunks, chunk_length)
 						next_chunk = ""
 					if len(word) < chunk_length:
 						next_chunk = word
 					else:
 						pos = 0
 						while pos < len(word):
-							if len(word)-pos == chunk_length:
-								chunks.append(word[pos:pos+chunk_length])
+							if len(word)-pos <= chunk_length:
+								self.add_chunk(word[pos:], chunks, chunk_length)
 								pos += chunk_length
 							else:
-								chunks.append(word[pos:pos+chunk_length-1]+"-")
+								self.add_chunk(word[pos:pos+chunk_length-1]+"-", chunks, chunk_length)
 								pos += chunk_length-1
 				print chunks
 			if len(next_chunk) > 0:
-				while len(next_chunk) < chunk_length:
-					next_chunk += " "
-				chunks.append(next_chunk)
+				self.add_chunk(next_chunk, chunks, chunk_length)
 		
 	def display_song(self):
 		if self.on:
@@ -205,8 +201,8 @@ class FrontPanel(object):
 				if self.song_title_artist != player_song_title_artist:
 					self.display_text("                ", 1, 0)
 					self.song_info = list()
-					self.split_into_chunks(player_song.title.strip(), self.song_info)
-					self.split_into_chunks(player_song.artist.strip(), self.song_info) 
+					self.split_into_chunks(player_song.title.strip(), self.song_info, 4)
+					self.split_into_chunks(player_song.artist.strip(), self.song_info, 4) 
 					self.song_info_index = 0
 					#print "Song info"
 					#print self.song_info
