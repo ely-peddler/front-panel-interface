@@ -8,6 +8,7 @@ import subprocess
 import sys
 import os
 import pylirc
+import psutil
 
 import Player
 
@@ -34,54 +35,78 @@ class FrontPanel(object):
 		self.blank_cell = "        "
 		self.text = [ [ self.blank_cell, self.blank_cell ], [ self.blank_cell, self.blank_cell ] ]
 
-        	self.standby_pin = 23
-        	GPIO.setup(self.standby_pin, GPIO.OUT)
-        	GPIO.output(self.standby_pin, GPIO.HIGH)
-
+		self.standby_pin = 23
+		GPIO.setup(self.standby_pin, GPIO.OUT)
+		GPIO.output(self.standby_pin, GPIO.HIGH)
 		time.sleep(1)
-
+		
 		self.ser = serial.Serial("/dev/ttyAMA0", 9600, timeout=5)
 #		time.sleep(1)
+		self.create_bar_chars()
 		self.setup_screen(250)
 		print("2")
 
 		self.col_pins = [ 11, 12, 13, 15, 16 ] #[ 16, 18, 22, 24, 26 ]
 		self.row_pins = [ 18, 22 ] #[ 21, 23 ]
 
-        	for col_pin in self.col_pins:
-                	print(col_pin)
-                	GPIO.setup(col_pin, GPIO.OUT)
-                	GPIO.output(col_pin, GPIO.LOW)
+		for col_pin in self.col_pins:
+			print(col_pin)
+			GPIO.setup(col_pin, GPIO.OUT)
+			GPIO.output(col_pin, GPIO.LOW)
 
-        	for row_pin in self.row_pins:
-                	print(row_pin)
-                	GPIO.setup(row_pin, GPIO.IN, pull_up_down = GPIO.PUD_DOWN)
+		for row_pin in self.row_pins:
+			print(row_pin)
+			GPIO.setup(row_pin, GPIO.IN, pull_up_down = GPIO.PUD_DOWN)
 
 		self.actions = [ [ "SELECT", "BACK", "OPEN", "REWIND", "FORWARD" ],
-                                 [ "NEXT", "PREVIOUS", "PAUSE", "PLAY", "STOP" ] ]
-        	self.action = ""	
+								 [ "NEXT", "PREVIOUS", "PAUSE", "PLAY", "STOP" ] ]
+		self.action = ""	
 		self.action_count = 0
 
-        	
+			
 		self.power_check_pin = 19
-        	GPIO.setup(self.power_check_pin, GPIO.IN)
+		GPIO.setup(self.power_check_pin, GPIO.IN)
+
+		self.resource_timestamp = datetime.datetime.now()
+		self.io_busy_time = psutil.disk_io_counters().busy_time
 
 		
-#        	self.powered_up_pin = 12
- #       	GPIO.setup(self.powered_up_pin, GPIO.OUT)
-  #      	GPIO.output(self.powered_up_pin, GPIO.HIGH)
+#			self.powered_up_pin = 12
+ #	   	GPIO.setup(self.powered_up_pin, GPIO.OUT)
+  #	  	GPIO.output(self.powered_up_pin, GPIO.HIGH)
 		
 	
 	def shutdown():
 		self.turn_off
 		GPIO.output(self.standby_pin, GPIO.HIGH)
 
+	def create_bar_chars(self):
+		print("Create bar chars")
+		for c in range(8): # 8 chars
+			print "character "+str(c)
+			self.ser.write(chr(64)+chr(c))
+			for r in range(8): # 8 rows of each char
+				if 7-r > c:
+					print "-"
+					self.ser.write(chr(0))
+				else:
+					print "#"
+					self.ser.write(chr(30))
+			self.ser.write(chr(0xFF))
+			print ""
+
+	def clear_row(self, row):
+		for c in range(2):
+			self.display_text(self.blank_cell, row, c)
+			
 	def clear_screen(self):
 		print("Clear screen")
-		self.ser.write(chr(4)+chr(0xFF))
-		self.text = [ [ self.blank_cell, self.blank_cell ], [ self.blank_cell, self.blank_cell ] ]
+		for r in range(2):
+			self.clear_row(r)
+		#self.text = [ [ self.blank_cell, self.blank_cell ], [ self.blank_cell, self.blank_cell ] ]
 		print(self.text)
-
+		self.ser.write(chr(4)+chr(0xFF))
+		
 	def setup_screen(self, brightness):
 		print("Setup screen")
 		#time.sleep(1)
@@ -128,10 +153,31 @@ class FrontPanel(object):
 			self.turn_off()
 		else:
 			self.turn_on()
+			
+	def display_respource(self, label, percent, pos):
+			self.ser.write(chr(2)+chr(1)+chr(pos*2+1)+chr(0xff))
+		 	self.write_text(label)
+		 	self.ser.write(chr(2)+chr(1)+chr(pos*2+2)+chr(0xff))
+		 	bar = int(percent/12.5)
+		 	self.ser.write(chr(10)+chr(bar)+chr(0xFF))
+
+	def display_respource_usage(self):
+		resource_timestamp = datetime.datetime.now()
+		io_busy_time = psutil.disk_io_counters().busy_time
+		if(self.on):
+			self.display_respource("c", psutil.cpu_percent(), 0)
+		 	self.display_respource("m", psutil.virtual_memory().percent, 1)
+		 	ms = (resource_timestamp - self.resource_timestamp).total_seconds()*1000
+		 	if(ms > 0):
+			 	self.display_respource("d", 100*(io_busy_time - self.io_busy_time)/ms, 2)
+			 	#self.display_respource("n", 100*psutil.disk_io_counters().busy_time/ms, 3)
+		self.io_busy_time = io_busy_time
+		self.resource_timestamp = resource_timestamp
 		
 	def display_clock(self):
 		 if(self.on):
 		 	self.display_text(datetime.datetime.now().strftime("%H:%M:%S"), 0, 1)
+		 	
 			
 	def display_text(self, text, row, col):
 #		print("Display '"+text+"' @ "+str(row)+","+str(col))
@@ -199,10 +245,10 @@ class FrontPanel(object):
 				#print self.song_title_artist
 				#print "================="
 				if self.song_title_artist != player_song_title_artist:
-					self.display_text("                ", 1, 0)
+					self.clear_row(1)
 					self.song_info = list()
-					self.split_into_chunks(player_song.title.strip(), self.song_info, 4)
-					self.split_into_chunks(player_song.artist.strip(), self.song_info, 4) 
+					self.split_into_chunks(player_song.title.strip(), self.song_info)
+					self.split_into_chunks(player_song.artist.strip(), self.song_info) 
 					self.song_info_index = 0
 					#print "Song info"
 					#print self.song_info
@@ -214,7 +260,7 @@ class FrontPanel(object):
 					self.display_text(self.song_info[int(self.song_info_index)], 1, 0)
 					self.song_info_index += 0.05
 			else:
-				self.display_text("                ", 1, 0)
+				self.clear_row(1)
 			self.song_title_artist = player_song_title_artist
 		
 	def check_for_input(self):
@@ -266,12 +312,12 @@ class FrontPanel(object):
 				self.turn_off()
 			elif(self.action_count == 20):
 				self.turn_on()  # to display shut down message
- 				self.display_text("Shutting down",1,0)
+				self.display_text("Shutting down",1,0)
 				self.on = False # to stop an other input or display
  			elif(self.action_count == 30):
- 				self.turn_off() 				
+				self.turn_off() 			
 				os.system( "poweroff" )
-  				sys.exit()
+				sys.exit()
 		elif(self.on and self.action_count == 0):
 			action = self.action
 			action_text = self.blank_cell
@@ -293,5 +339,5 @@ class FrontPanel(object):
 				action_text = self.blank_cell
 			if(action_text != self.blank_cell):
 				print("Action '"+action_text+"'")
-			self.display_text(action_text, 0,0)
+			#self.display_text(action_text, 1,0)
 
